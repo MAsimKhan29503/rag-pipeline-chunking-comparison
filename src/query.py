@@ -2,9 +2,8 @@
 Step 4: Query + Compare
 
 Takes a natural-language question, embeds it with the same local model used
-for the chunks, and queries BOTH Pinecone namespaces (fixed-size vs
-paragraph-based chunking) so you can see side by side which strategy
-retrieves more relevant, complete context for a given question.
+for the chunks, and queries BOTH Pinecone namespaces so you can compare
+retrieval quality side by side.
 
 Usage:
     python src/query.py "How does Structured Streaming handle late data?"
@@ -57,13 +56,6 @@ def main():
 
     print_matches("FIXED-SIZE CHUNKING", fixed_matches)
     print_matches("PARAGRAPH-BASED CHUNKING", semantic_matches)
-
-    print(
-        "\n\nCompare the two blocks above: which strategy's top result actually "
-        "answers the question more completely, without cutting off mid-sentence "
-        "or mid-idea? That's your evidence for a README write-up on which "
-        "chunking strategy performed better for this dataset."
-    )
 
 
 if __name__ == "__main__":
