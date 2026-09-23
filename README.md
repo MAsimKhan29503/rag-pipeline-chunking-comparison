@@ -30,6 +30,62 @@ Both are stored in separate Pinecone namespaces (`fixed-chunking` and
 `semantic-chunking`) inside the same index, so a single query script can retrieve
 from both and show you the difference side by side.
 
+## Findings
+
+I tested both chunking strategies against Pinecone using a mix of specific,
+combinatorial, and broad questions about Spark's documentation. Two real
+results are worth documenting:
+
+### 1. A scraping bug taught me not to trust results blindly
+
+My first test run scraped `structured-streaming-programming-guide.html`
+directly — but Spark 4.0 replaced that page with a short redirect notice
+pointing to a *new* set of split-up pages. My scraper faithfully extracted
+that redirect stub (186 characters, no real content), and both chunking
+strategies returned low-relevance results for every Structured Streaming
+question — not because of a chunking problem, but because the actual source
+content was never captured in the first place.
+
+I fixed this by tracing the real destination URLs (`streaming/index.html`
+and its sub-pages) and updating `SOURCE_URLS` in `config.py`, plus added a
+safety check in `scraper.py` that now warns immediately if a scraped page
+comes back under 500 characters — instead of the problem surfacing three
+steps downstream at query time.
+
+**Takeaway:** a RAG pipeline is only as good as its source coverage. Bad
+retrieval scores can be a chunking problem, an embedding problem, or —
+as it was here — a data-completeness problem further upstream. Always
+verify the raw scraped content before trusting the numbers on top of it.
+
+### 2. A higher similarity score doesn't always mean a more relevant chunk
+
+For the question *"How does Structured Streaming handle late-arriving data?"*,
+after fixing the scraping bug:
+
+| Strategy | Top score | Actually about late data? |
+|---|---|---|
+| Fixed-size | 0.688 | Yes — explains the 2-hour late-data threshold directly |
+| Paragraph-based | 0.795 (highest of either strategy) | No — about asynchronous progress tracking/checkpointing |
+
+Paragraph-based chunking's top result scored *higher* but was topically
+off — it matched on shared vocabulary ("processing," "latency") rather
+than the actual concept asked about. Fixed-size chunking's top-2 results
+were both directly on-topic despite lower raw scores.
+
+**Takeaway:** similarity score measures embedding closeness, not
+correctness. Evaluating a RAG system means reading what was actually
+retrieved, not just trusting the ranking metric — a lesson that matters
+more than which strategy "wins."
+
+### Overall
+
+Across this dataset, neither strategy dominated consistently — results
+were close and sometimes contradicted the score ranking, as above. If
+anything, fixed-size chunking's predictable boundaries made it slightly
+easier to reason about for these documentation-style questions, while
+paragraph-based chunking's variable size sometimes produced longer,
+less focused chunks that pulled in tangential content.
+
 ## Setup
 
 Run this on your own machine (not a sandboxed environment) since step 1 needs
