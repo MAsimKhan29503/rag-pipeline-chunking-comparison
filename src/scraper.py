@@ -78,7 +78,12 @@ def scrape_all(urls=None, out_dir=None, delay_seconds: float = 1.5):
             filepath = os.path.join(out_dir, filename)
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(text)
-            print(f"    -> saved {len(text)} chars to {filepath}")
+
+            if len(text) < 500:
+                print(f"    !! WARNING: only {len(text)} chars scraped — this looks too short, "
+                      f"check if the page redirected or the content selector missed the real content")
+            else:
+                print(f"    -> saved {len(text)} chars to {filepath}")
             results.append((url, filepath))
         except requests.RequestException as e:
             print(f"    !! failed to fetch {url}: {e}")

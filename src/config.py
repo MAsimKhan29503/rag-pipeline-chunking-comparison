@@ -16,7 +16,11 @@ EMBEDDING_DIM = 384
 
 # --- Source documents to scrape ---
 SOURCE_URLS = [
-    "https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html",
+    "https://spark.apache.org/docs/latest/streaming/index.html",
+    "https://spark.apache.org/docs/latest/streaming/getting-started.html",
+    "https://spark.apache.org/docs/latest/streaming/apis-on-dataframes-and-datasets.html",
+    "https://spark.apache.org/docs/latest/streaming/performance-tips.html",
+    "https://spark.apache.org/docs/latest/streaming/additional-information.html",
     "https://spark.apache.org/docs/latest/sql-programming-guide.html",
     "https://spark.apache.org/docs/latest/rdd-programming-guide.html",
     "https://spark.apache.org/docs/latest/streaming-programming-guide.html",
