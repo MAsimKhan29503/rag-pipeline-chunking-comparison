@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.pyc
+.env
+data/raw/*.txt
+data/chunks/*.json
+!data/raw/.gitkeep
+!data/chunks/.gitkeep
