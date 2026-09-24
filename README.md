@@ -33,7 +33,7 @@ from both and show you the difference side by side.
 ## Findings
 
 I tested both chunking strategies against Pinecone using a mix of specific,
-combinatorial, and broad questions about Spark's documentation. Two real
+combinatorial, and broad questions about Spark's documentation. Three real
 results are worth documenting:
 
 ### 1. A scraping bug taught me not to trust results blindly
@@ -72,10 +72,73 @@ off — it matched on shared vocabulary ("processing," "latency") rather
 than the actual concept asked about. Fixed-size chunking's top-2 results
 were both directly on-topic despite lower raw scores.
 
+This pattern repeated on an unrelated question about watermarking, where a
+"Stream-Static join support" compatibility table — not a watermarking
+document at all — ranked #1 for fixed-size and #2 for semantic chunking,
+pulled in purely by shared vocabulary ("streaming," "stateful,"
+"supported").
+
 **Takeaway:** similarity score measures embedding closeness, not
 correctness. Evaluating a RAG system means reading what was actually
 retrieved, not just trusting the ranking metric — a lesson that matters
 more than which strategy "wins."
+
+### 3. A chunking bug produced context-free orphan fragments — found, fixed, and verified
+
+For the question *"How does Structured Streaming achieve exactly-once
+semantics?"*, paragraph-based chunking's top result was:
+
+> `"end-to-end exactly-once semantics under any failure...."`
+
+A single sentence fragment with no surrounding context — not useful on its
+own, despite scoring highest (0.6518). Meanwhile, the chunk with the
+complete, self-contained "At least once" / "Exactly once" definitions
+scored lowest of the three shown (0.5175) and ranked #3.
+
+The root cause was a bug in `paragraph_chunks()`: when the loop over a
+source page finished, any small leftover text (`current`) was appended as
+its own chunk regardless of size — so a page ending mid-thought produced a
+tiny, context-free chunk with an inflated relevance score, purely because
+short chunks tend to match narrowly and score high on specific queries.
+
+**The fix**, in `chunking.py`:
+
+```python
+if current:
+    if chunks and len(current) < min_chunk_chars:
+        # Too small to stand alone — merge into the previous chunk
+        # instead of leaving an orphaned fragment with no context.
+        chunks[-1] = chunks[-1] + "\n\n" + current
+    else:
+        chunks.append(current)
+```
+
+**Before vs. after re-running the pipeline**, same question, paragraph-based
+chunking:
+
+| | Rank | Score | Content |
+|---|---|---|---|
+| Before | #1 | 0.6518 | Orphan fragment — no context |
+| Before | #3 | 0.5175 | Full definitions of all three guarantee types |
+| After | #1 | 0.7320 | Full definitions of all three guarantee types |
+| After | — | — | Orphan fragment no longer appears in top 3 |
+
+The genuinely useful chunk moved from #3 to #1, and its score rose because
+merging gave it more surrounding context and keyword density.
+
+Interestingly, fixed-size chunking's top result for the same question
+started mid-word (`"gether, using replayable sources and idempotent
+sinks..."` — the tail end of "altogether"). This looks similar to the
+orphan problem but is actually a different, more fundamental issue: fixed-
+size chunking cuts at a fixed character count regardless of where a word or
+sentence falls, so this can't be patched the way the paragraph-chunker's
+bug was — it's inherent to the strategy.
+
+**Takeaway:** not every chunking flaw is inherent to the strategy — some are
+implementation bugs. The orphan-fragment issue was fixable with a small,
+targeted patch (and worth catching before it silently deflates a chunking
+strategy's evaluation). Fixed-size chunking's mid-word cutoff, by contrast,
+is a structural limitation of the approach itself.
 
 ### Overall
 
@@ -84,7 +147,8 @@ were close and sometimes contradicted the score ranking, as above. If
 anything, fixed-size chunking's predictable boundaries made it slightly
 easier to reason about for these documentation-style questions, while
 paragraph-based chunking's variable size sometimes produced longer,
-less focused chunks that pulled in tangential content.
+less focused chunks — or, before the fix above, the occasional
+context-free orphan — that pulled in tangential content.
 
 ## Setup
 
@@ -128,6 +192,7 @@ After running a handful of queries, note down:
 - Which strategy's top-ranked chunk actually answered the question more completely
 - Whether fixed-size chunking ever cut off a key sentence mid-thought
 - Whether paragraph-based chunking ever returned a chunk that was too long/unfocused
+  or, before the fix in Finding 3, a context-free orphan fragment
 - The average chunk count and size for each strategy (printed by `chunking.py`)
 
 That comparison — backed by real retrieved examples — is what makes this project
@@ -141,6 +206,8 @@ more than a tutorial clone.
 - Add a third chunking strategy (e.g. sentence-window or recursive character splitting
   via LangChain) for a three-way comparison
 - Wrap `query.py` in a small Streamlit app so it's demoable, not just a CLI script
+- Extend the orphan-merge fix to catch mid-document fragments, not just ones at the
+  end of a page's chunk list
 
 ## Project structure
 

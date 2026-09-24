@@ -60,7 +60,12 @@ def paragraph_chunks(text: str, min_chunk_chars: int = 300, max_chunk_chars: int
                 chunks.append(current)
                 current = ""
     if current:
-        chunks.append(current)
+        if chunks and len(current) < min_chunk_chars:
+            # Too small to stand alone — merge into the previous chunk
+            # instead of leaving an orphaned fragment with no context.
+            chunks[-1] = chunks[-1] + "\n\n" + current
+        else:
+            chunks.append(current)
 
     return chunks
 
